@@ -1,0 +1,33 @@
+# Impeccable Skill Integration for Cursor (Claude / ChatGPT)
+
+You are assisting with the front-end design of the AIGC project.
+The project is configured with the "impeccable" design skill (located in `.gemini/skills/impeccable/`).
+
+## Core Reference Files
+- **Design Skill Guide**: `.gemini/skills/impeccable/SKILL.md` (Contains absolute bans, typography, and motion guidelines. Read this first!)
+- **Product Strategy**: `PRODUCT.md` (Register: brand, Mood: 新中式/简约/留白)
+- **Visual Design Spec**: `DESIGN.md` (OKLCH color system, typography rules, motion parameters)
+
+## Design Rules (Strictly Enforced)
+1. **Color System (OKLCH)**:
+   - Background: `oklch(0.990 0.005 85)` (宣纸白 - 温润暖白)
+   - Ink/Text: `oklch(0.200 0.020 230)` (黛墨 - 确保对比度 >= 7:1)
+   - Primary: `oklch(0.450 0.086 230.0)` (霁蓝 - 核心锚点与交互)
+   - Accent: `oklch(0.450 0.080 35)` (暗朱砂 - 极度克制点缀，不铺陈)
+2. **Absolute Bans (AI Slop Checks)**:
+   - NO side-stripe borders (border-left/right > 1px as colored accents on cards/callouts).
+   - NO gradient text (background-clip: text with gradient).
+   - NO decorative glassmorphism.
+   - NO hero-metric templates (big number + small label).
+   - NO identical card grids repeated endlessly.
+   - NO tiny uppercase tracked eyebrows on every section.
+   - NO arbitrary `z-index` like 999 or 9999. Use a structured scale.
+   - NEVER animate `<img>` elements on hover (including parent hover group scales).
+3. **Motion**:
+   - Smooth exponential curve transitions only (ease-out-expo or ease-out-quint). No spring/bounce.
+   - Leverage opacity and blur transitions to simulate ink-spreading (水墨晕染).
+
+## Setup & Scripts
+Before coding, ensure you check the context:
+- Run context helper: `node .gemini/skills/impeccable/scripts/context.mjs`
+- Run color helper (if updating palette): `node .gemini/skills/impeccable/scripts/palette.mjs`

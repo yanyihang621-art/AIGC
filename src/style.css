@@ -191,8 +191,14 @@ p { text-wrap: pretty; }
   cursor: pointer;
   transition: fill var(--dur-fast) var(--ease-out-expo),
               stroke var(--dur-fast) var(--ease-out-expo),
+              stroke-width var(--dur-fast) var(--ease-out-expo),
               transform var(--dur-fast) var(--ease-out-expo);
   transform-origin: center;
+}
+
+#map-placeholder svg path:not([fill="#eee"]) {
+  pointer-events: none;
+  cursor: default;
 }
 
 #map-placeholder svg path:hover {
@@ -205,6 +211,21 @@ p { text-wrap: pretty; }
   fill: var(--province-active);
   stroke: var(--accent);
   stroke-width: 1.5;
+}
+
+/* Highlight overlay paths — rendered on top of all provinces */
+#highlight-overlay .hover-overlay {
+  fill: var(--province-hover);
+  stroke: var(--primary);
+  stroke-width: 1.2;
+  transition: none;
+}
+
+#highlight-overlay .active-overlay {
+  fill: var(--province-active);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  transition: none;
 }
 
 /* ============================================================

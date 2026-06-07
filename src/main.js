@@ -19,45 +19,88 @@ let activeProvince = null;
 let isStreaming = false;
 let abortController = null;
 
-// Initial 35-path index mapping from public/china.svg
-// We will verify and adjust this sequence if needed
-const PROVINCES = [
-  "河北",       // 0
-  "北京",       // 1
-  "天津",       // 2
-  "山西",       // 3
-  "内蒙古",     // 4
-  "辽宁",       // 5
-  "吉林",       // 6
-  "黑龙江",     // 7
-  "台湾",       // 8
-  "浙江",       // 9
-  "上海",       // 10
-  "江西",       // 11
-  "福建",       // 12
-  "湖北",       // 13
-  "湖南",       // 14
-  "江苏",       // 15
-  "安徽",       // 16
-  "山东",       // 17
-  "河南",       // 18
-  "广东",       // 19
-  "海南",       // 20
-  "广西",       // 21
-  "四川",       // 22
-  "贵州",       // 23
-  "云南",       // 24
-  "西藏",       // 25
-  "陕西",       // 26
-  "甘肃",       // 27
-  "青海",       // 28
-  "宁夏",       // 29
-  "新疆",       // 30
-  "钓鱼岛",     // 31
-  "香港",       // 32
-  "澳门",       // 33
-  "南海诸岛"    // 34
+/* ============================================================
+   Province identification by bounding box center coordinates.
+   Each entry maps to a path in public/china.svg (fill="#eee").
+   The SVG viewBox is 578×344; X → East, Y → South.
+   Coordinates were extracted from the actual path geometry.
+   ============================================================ */
+const PROVINCE_CENTERS = [
+  { name: "北京",     cx: 354.4, cy: 115.5 },
+  { name: "天津",     cx: 359.4, cy: 121.4 },
+  { name: "河北",     cx: 355.5, cy: 121.4 },
+  { name: "山西",     cx: 332.6, cy: 133.0 },
+  { name: "内蒙古",   cx: 328.4, cy: 73.6  },
+  { name: "辽宁",     cx: 385.9, cy: 109.2 },
+  { name: "吉林",     cx: 408.3, cy: 91.0  },
+  { name: "黑龙江",   cx: 417.2, cy: 51.3  },
+  { name: "上海",     cx: 381.4, cy: 175.1 },
+  { name: "江苏",     cx: 369.0, cy: 164.4 },
+  { name: "浙江",     cx: 375.7, cy: 188.2 },
+  { name: "安徽",     cx: 358.7, cy: 170.2 },
+  { name: "福建",     cx: 363.5, cy: 207.7 },
+  { name: "江西",     cx: 352.1, cy: 199.6 },
+  { name: "山东",     cx: 366.8, cy: 141.9 },
+  { name: "河南",     cx: 338.5, cy: 158.3 },
+  { name: "湖北",     cx: 331.8, cy: 175.8 },
+  { name: "湖南",     cx: 327.8, cy: 199.0 },
+  { name: "广东",     cx: 338.1, cy: 225.9 },
+  { name: "广西",     cx: 310.4, cy: 220.9 },
+  { name: "海南",     cx: 336.9, cy: 286.7 },
+  { name: "重庆",     cx: 307.5, cy: 181.9 },
+  { name: "四川",     cx: 281.7, cy: 181.5 },
+  { name: "贵州",     cx: 301.4, cy: 201.8 },
+  { name: "云南",     cx: 275.9, cy: 211.9 },
+  { name: "西藏",     cx: 205.4, cy: 171.9 },
+  { name: "陕西",     cx: 310.9, cy: 146.3 },
+  { name: "甘肃",     cx: 268.7, cy: 132.0 },
+  { name: "青海",     cx: 245.7, cy: 148.0 },
+  { name: "宁夏",     cx: 298.0, cy: 135.6 },
+  { name: "新疆",     cx: 184.9, cy: 101.7 },
+  { name: "台湾",     cx: 384.2, cy: 219.8 },
+  { name: "香港",     cx: 341.8, cy: 228.9 },
+  { name: "澳门",     cx: 338.8, cy: 230.1 },
+  { name: "南海诸岛", cx: 349.2, cy: 275.0 },
 ];
+
+/**
+ * Compute the bounding-box center of a <path> element's "d" attribute.
+ */
+function getPathCenter(d) {
+  const numRegex = /([\d.]+),([\d.]+)/g;
+  let m;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  while ((m = numRegex.exec(d)) !== null) {
+    const x = parseFloat(m[1]);
+    const y = parseFloat(m[2]);
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  if (minX === Infinity) return null;
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+/**
+ * Match a path's bounding-box center to the closest known province.
+ */
+function identifyProvince(d) {
+  const center = getPathCenter(d);
+  if (!center) return null;
+
+  let best = null;
+  let bestDist = Infinity;
+  for (const p of PROVINCE_CENTERS) {
+    const dist = Math.hypot(center.cx - p.cx, center.cy - p.cy);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = p;
+    }
+  }
+  // Only accept if reasonably close (< 5 units in SVG coordinates)
+  return bestDist < 5 ? best.name : null;
+}
 
 /* ============================================================
    Tooltip — follows cursor
@@ -89,7 +132,10 @@ function setUIState(state) {
    ============================================================ */
 function initMap() {
   const map = document.getElementById('china-map');
-  if (!map) return;
+  const placeholder = document.getElementById('map-placeholder');
+  if (!map || !placeholder) return;
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
 
   // Ensure SVG responsiveness
   if (!map.getAttribute('viewBox')) {
@@ -98,34 +144,157 @@ function initMap() {
     map.setAttribute('viewBox', `0 0 ${w} ${h}`);
     map.removeAttribute('width');
     map.removeAttribute('height');
-    map.style.width = '100%';
-    map.style.height = '100%';
+    map.setAttribute('style', 'width: 100%; height: 100%;');
   }
 
-  // Select all province paths in SVG
-  const paths = map.querySelectorAll('path');
+  // --- Create overlay group for hover/active highlights ---
+  // This group sits on top of all province paths in the SVG tree,
+  // so its children render above everything else.
+  // pointer-events:none ensures mouse events pass through to the real paths.
+  const overlayGroup = document.createElementNS(SVG_NS, 'g');
+  overlayGroup.setAttribute('id', 'highlight-overlay');
+  overlayGroup.setAttribute('pointer-events', 'none');
+  map.appendChild(overlayGroup);
 
-  paths.forEach((path, index) => {
-    // Determine corresponding province name (fallback to path index if out of bounds)
-    const provinceName = PROVINCES[index] || `省份 ${index + 1}`;
+  // Reusable overlay <path> for hover highlight
+  const hoverOverlay = document.createElementNS(SVG_NS, 'path');
+  hoverOverlay.setAttribute('pointer-events', 'none');
+  hoverOverlay.classList.add('hover-overlay');
+  hoverOverlay.style.display = 'none';
+  overlayGroup.appendChild(hoverOverlay);
+
+  // Reusable overlay <path> for active (clicked) highlight
+  const activeOverlay = document.createElementNS(SVG_NS, 'path');
+  activeOverlay.setAttribute('pointer-events', 'none');
+  activeOverlay.classList.add('active-overlay');
+  activeOverlay.style.display = 'none';
+  overlayGroup.appendChild(activeOverlay);
+
+  // --- Zoom & Pan Logic ---
+  let scale = 1;
+  let translateX = 0;
+  let translateY = 0;
+  let isDragging = false;
+  let hasDragged = false;
+  let startX = 0;
+  let startY = 0;
+
+  map.style.transformOrigin = '0 0';
+  map.style.transition = 'transform 0.1s ease-out'; // Smooth wheel zoom
+  
+  function constrainTranslation(tx, ty, s) {
+    const containerW = placeholder.clientWidth;
+    const containerH = placeholder.clientHeight;
+
+    const mapW = containerW * s;
+    const mapH = containerH * s;
+
+    // Constrain so at least 30% of the map remains visible in the viewport
+    const minX = containerW * 0.3 - mapW;
+    const maxX = containerW * 0.7;
+    const minY = containerH * 0.3 - mapH;
+    const maxY = containerH * 0.7;
+
+    return {
+      x: Math.max(minX, Math.min(maxX, tx)),
+      y: Math.max(minY, Math.min(maxY, ty))
+    };
+  }
+
+  function updateTransform() {
+    const bounded = constrainTranslation(translateX, translateY, scale);
+    translateX = bounded.x;
+    translateY = bounded.y;
+    map.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+  }
+
+  placeholder.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const zoomFactor = 0.15;
+    const delta = e.deltaY < 0 ? (1 + zoomFactor) : (1 - zoomFactor);
+    let newScale = scale * delta;
+    newScale = Math.max(0.5, Math.min(newScale, 10)); // Min and max zoom constraints
+
+    const rect = placeholder.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    translateX = mouseX - (mouseX - translateX) * (newScale / scale);
+    translateY = mouseY - (mouseY - translateY) * (newScale / scale);
+    scale = newScale;
+
+    updateTransform();
+  }, { passive: false });
+
+  placeholder.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; // Only left mouse button
+    isDragging = true;
+    hasDragged = false;
+    map.style.transition = 'none'; // Disable transition during drag for immediate response
+    startX = e.clientX - translateX;
+    startY = e.clientY - translateY;
+    placeholder.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const newTranslateX = e.clientX - startX;
+    const newTranslateY = e.clientY - startY;
+    if (Math.abs(newTranslateX - translateX) > 3 || Math.abs(newTranslateY - translateY) > 3) {
+      hasDragged = true;
+    }
+    translateX = newTranslateX;
+    translateY = newTranslateY;
+    updateTransform();
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      map.style.transition = 'transform 0.1s ease-out';
+      placeholder.style.cursor = 'default';
+    }
+  });
+
+  // --- Identify and tag province paths ---
+  const paths = map.querySelectorAll('path[fill="#eee"]');
+  
+  paths.forEach((path) => {
+    const d = path.getAttribute('d');
+    if (!d) return;
+
+    const provinceName = identifyProvince(d);
+    if (!provinceName) return; // Skip unidentified paths (e.g. decorative)
+
+    // Inject data-name for reliable identification
+    path.setAttribute('data-name', provinceName);
 
     path.addEventListener('mouseenter', () => {
-      tooltip.textContent = `${provinceName} (Index: ${index})`;
+      tooltip.textContent = provinceName;
       tooltip.classList.add('visible');
+
+      // Show hover overlay — copy the path geometry and render on top
+      hoverOverlay.setAttribute('d', d);
+      hoverOverlay.style.display = '';
     });
 
     path.addEventListener('mouseleave', () => {
       tooltip.classList.remove('visible');
+      hoverOverlay.style.display = 'none';
     });
 
     path.addEventListener('click', () => {
-      if (isStreaming) return;
+      if (isStreaming || hasDragged) return;
 
-      // Clear previous active states
+      // Clear previous active states from original paths
       map.querySelectorAll('path.active').forEach(p => p.classList.remove('active'));
 
-      // Highlight current path
+      // Mark current path as active
       path.classList.add('active');
+
+      // Show active overlay — copy geometry and render on top
+      activeOverlay.setAttribute('d', d);
+      activeOverlay.style.display = '';
 
       // Update right detail panel
       panelProvince.textContent = provinceName;
@@ -325,16 +494,12 @@ async function loadMap() {
     const svgText = await res.text();
     const placeholder = document.getElementById('map-placeholder');
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgText, 'image/svg+xml');
-    const svg = doc.querySelector('svg');
+    placeholder.innerHTML = svgText;
+    const svg = placeholder.querySelector('svg');
     if (!svg) throw new Error('No SVG element found');
 
     svg.id = 'china-map';
     svg.setAttribute('aria-hidden', 'true');
-
-    placeholder.innerHTML = '';
-    placeholder.appendChild(svg);
 
     initMap();
   } catch (e) {

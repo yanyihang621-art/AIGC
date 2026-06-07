@@ -20,6 +20,12 @@ let isStreaming = false;
 let abortController = null;
 
 /* ============================================================
+   Client-side Cache — 避免重复调用 API
+   key = province name, value = markdown string
+   ============================================================ */
+const contentCache = new Map();
+
+/* ============================================================
    Province identification by bounding box center coordinates.
    Each entry maps to a path in public/china.svg (fill="#eee").
    The SVG viewBox is 578×344; X → East, Y → South.
@@ -318,6 +324,22 @@ async function loadProvinceContent(province) {
   isStreaming = true;
   abortController = new AbortController();
 
+  // ---- 客户端缓存命中：直接用打字机效果展示 ----
+  if (contentCache.has(province)) {
+    setUIState('content');
+    const cachedMarkdown = contentCache.get(province);
+    generatedText.innerHTML = parseMarkdown(cachedMarkdown);
+    // 添加淡入效果
+    generatedText.style.opacity = '0';
+    requestAnimationFrame(() => {
+      generatedText.style.transition = 'opacity 0.4s ease-in';
+      generatedText.style.opacity = '1';
+    });
+    isStreaming = false;
+    return;
+  }
+
+  // ---- 未命中缓存：调用后端 API ----
   try {
     await streamFromAPI(province, generatedText, abortController.signal);
   } catch (err) {
@@ -376,6 +398,10 @@ async function streamFromAPI(province, container, signal) {
       if (data === '[DONE]') {
         cursor.remove();
         isStreaming = false;
+        // 缓存到客户端，下次点击直接展示
+        if (accumulatedMarkdown.trim()) {
+          contentCache.set(province, accumulatedMarkdown);
+        }
         return;
       }
 
@@ -400,6 +426,10 @@ async function streamFromAPI(province, container, signal) {
 
   cursor.remove();
   isStreaming = false;
+  // 兜底缓存（流结束但未收到 [DONE] 信号时）
+  if (accumulatedMarkdown.trim() && !contentCache.has(province)) {
+    contentCache.set(province, accumulatedMarkdown);
+  }
 }
 
 /* ============================================================

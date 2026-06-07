@@ -100,11 +100,9 @@ Implement the feature following the design brief. Build in passes so structure, 
 
 ## Step 5: Iterate Visually
 
-Look at what you built like a designer would. Your eyes are whatever the harness gives you: a connected browser, a screenshotting tool, Playwright, or asking the user. Use them for responsive testing (mobile, tablet, desktop minimum) and general visual validation.
+Look at what you built like a designer would. Use responsive testing (mobile, tablet, desktop minimum) and general visual validation to verify the UI.
 
-If your tool returns a file path, read the PNG back into the conversation. A screenshot you didn't read doesn't count.
-
-For long-form brand surfaces, inspect major sections individually. Thumbnails hide spacing, clipping, and cascade defects.
+For long-form brand surfaces, inspect major sections individually.
 
 After the first pass, write an honest critique against the brief, the approved mock's major ingredients (hero silhouette, motifs, imagery, nav/CTA, density), and impeccable's DON'Ts. Patch material defects and re-inspect. **Don't invent defects to demonstrate iteration.** A confident "first pass clean, shipping" beats a fake fix.
 

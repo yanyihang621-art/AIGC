@@ -28,6 +28,38 @@
         </div>
         <!-- Tooltip -->
         <div id="tooltip" role="tooltip"></div>
+
+        <!-- 历史时间轴拨盘 -->
+        <nav id="era-timeline" aria-label="朝代时间轴">
+          <div id="era-track">
+            <div id="era-track-line"></div>
+            <div id="era-track-fill"></div>
+            <button class="era-node active" data-era="远古至先秦" data-index="0" aria-pressed="true">
+              <span class="era-dot"></span>
+              <span class="era-label">先秦</span>
+            </button>
+            <button class="era-node" data-era="秦汉" data-index="1" aria-pressed="false">
+              <span class="era-dot"></span>
+              <span class="era-label">秦汉</span>
+            </button>
+            <button class="era-node" data-era="魏晋南北朝" data-index="2" aria-pressed="false">
+              <span class="era-dot"></span>
+              <span class="era-label">魏晋</span>
+            </button>
+            <button class="era-node" data-era="隋唐" data-index="3" aria-pressed="false">
+              <span class="era-dot"></span>
+              <span class="era-label">隋唐</span>
+            </button>
+            <button class="era-node" data-era="宋元" data-index="4" aria-pressed="false">
+              <span class="era-dot"></span>
+              <span class="era-label">宋元</span>
+            </button>
+            <button class="era-node" data-era="明清" data-index="5" aria-pressed="false">
+              <span class="era-dot"></span>
+              <span class="era-label">明清</span>
+            </button>
+          </div>
+        </nav>
       </section>
 
       <!-- RIGHT: Content Panel -->
@@ -37,33 +69,87 @@
           <h1 id="panel-province">点击省份<br/>开始探寻</h1>
         </header>
 
-        <div id="panel-body">
-          <!-- Idle state -->
-          <div id="idle-state" aria-hidden="true">
-            <div class="idle-line"></div>
-            <div class="idle-line"></div>
-            <div class="idle-line"></div>
-            <div class="idle-line"></div>
-            <p id="idle-hint">在这片土地上<br/>每一处山河都藏着故事<br/>每一方人情都蕴着文明</p>
+        <!-- Tab Navigation -->
+        <nav id="panel-tabs" aria-label="内容切换">
+          <button class="panel-tab active" data-tab="culture" aria-pressed="true" id="tab-culture">
+            <span class="tab-icon">卷</span>
+            <span class="tab-text">文化探寻</span>
+          </button>
+          <button class="panel-tab" data-tab="chat" aria-pressed="false" id="tab-chat">
+            <span class="tab-icon">士</span>
+            <span class="tab-text">会名士</span>
+          </button>
+        </nav>
+
+        <!-- Culture View (existing) -->
+        <div id="culture-view" class="tab-view active">
+          <div id="panel-body">
+            <!-- Idle state -->
+            <div id="idle-state" aria-hidden="true">
+              <div class="idle-line"></div>
+              <div class="idle-line"></div>
+              <div class="idle-line"></div>
+              <div class="idle-line"></div>
+              <p id="idle-hint">在这片土地上<br/>每一处山河都藏着故事<br/>每一方人情都蕴着文明</p>
+            </div>
+
+            <!-- Loading state -->
+            <div id="loading-state" aria-live="polite" aria-label="正在生成内容">
+              <div class="ink-dots-row">
+                <div class="ink-dot"></div>
+                <div class="ink-dot"></div>
+                <div class="ink-dot"></div>
+              </div>
+              <div class="loading-lines">
+                <div class="loading-line-shimmer"></div>
+                <div class="loading-line-shimmer"></div>
+                <div class="loading-line-shimmer"></div>
+              </div>
+            </div>
+
+            <!-- Generated content -->
+            <div id="generated-content" aria-live="polite">
+              <div id="generated-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat View (新增：会名士) -->
+        <div id="chat-view" class="tab-view">
+          <!-- NPC Context Bar -->
+          <div id="chat-context-bar">
+            <span class="chat-context-seal">士</span>
+            <div class="chat-context-info">
+              <span class="chat-context-label">当前名士</span>
+              <span id="chat-npc-name">待寻访</span>
+            </div>
           </div>
 
-          <!-- Loading state -->
-          <div id="loading-state" aria-live="polite" aria-label="正在生成内容">
-            <div class="ink-dots-row">
-              <div class="ink-dot"></div>
-              <div class="ink-dot"></div>
-              <div class="ink-dot"></div>
+          <!-- Scroll-like message area -->
+          <div id="chat-scroll-area" aria-live="polite" aria-label="对话记录">
+            <!-- Empty State -->
+            <div id="chat-empty-state">
+              <div class="chat-empty-brush">翰</div>
+              <p class="chat-empty-text">
+                选定省份与朝代<br/>
+                唤醒沉睡千年的名士<br/>
+                与古人促膝长谈
+              </p>
+              <p class="chat-empty-hint">试问："先生平生最得意之作为何？"</p>
             </div>
-            <div class="loading-lines">
-              <div class="loading-line-shimmer"></div>
-              <div class="loading-line-shimmer"></div>
-              <div class="loading-line-shimmer"></div>
-            </div>
+
+            <!-- Messages Container -->
+            <div id="chat-messages" aria-label="对话内容"></div>
           </div>
 
-          <!-- Generated content -->
-          <div id="generated-content" aria-live="polite">
-            <div id="generated-text"></div>
+          <!-- Input Area -->
+          <div id="chat-input-area">
+            <div id="chat-input-wrapper">
+              <textarea id="chat-input" placeholder="请向名士提问…" rows="1" maxlength="500" aria-label="输入对话内容"></textarea>
+              <button id="chat-send-btn" aria-label="发送" title="落笔发送">
+                <span class="send-text">落笔</span>
+              </button>
+            </div>
           </div>
         </div>
 

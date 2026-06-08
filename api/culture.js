@@ -3,17 +3,23 @@ const API_URL = 'https://api.deepseek.com/chat/completions'
 
 // Server-side cache (ephemeral in serverless but works for warm containers)
 const responseCache = new Map()
-const MAX_CACHE_SIZE = 34
+const MAX_CACHE_SIZE = 200
 
-function cacheResponse(province, text) {
-  if (responseCache.size >= MAX_CACHE_SIZE && !responseCache.has(province)) {
+function cacheResponse(key, text) {
+  if (responseCache.size >= MAX_CACHE_SIZE && !responseCache.has(key)) {
     const firstKey = responseCache.keys().next().value
     responseCache.delete(firstKey)
   }
-  responseCache.set(province, text)
+  responseCache.set(key, text)
 }
 
-const SYSTEM_PROMPT = `你是"寻迹华夏"文化地图的 AI 叙事引擎，专门为中国各省份撰写精炼的文化散文。
+const SYSTEM_PROMPT = `你是"寻迹华夏"文化地图的 AI 叙事引擎，专门为中国各省份在不同历史时期撰写精炼的文化散文。
+
+## 核心机制
+你将收到两个坐标：一个【地点】和一个【时代】。你需要像一位学识渊博的历史学者，精确定位到该地在该时代的文化风貌进行叙述。
+- 如果某个省份在该时代尚未设省或名称不同，请使用该时期的历史地名（如唐代的陕西可称"关中"或"京畿"，先秦的四川可称"巴蜀"）。
+- 非遗项目应选择在该时代已经存在或萌芽的技艺，如果某项非遗在该时代尚未出现，请选择该时代该地真实存在的代表性工艺或艺术形式。
+- 历史名士必须是该时代与该地渊源深厚的真实人物，严禁时代错位。
 
 ## 风格要求
 - 语言：典雅的古风散文体，兼具余秋雨《文化苦旅》的深邃与汪曾祺散文的灵动。行文讲究节奏感，长短句交替。
@@ -22,14 +28,16 @@ const SYSTEM_PROMPT = `你是"寻迹华夏"文化地图的 AI 叙事引擎，专
 
 ## 输出结构（严格遵守）
 
-第一段（无标题）：用2-3句话勾勒该省的文化气质与地理人文定位，要有画面感。
+第一段（无标题）：用2-3句话勾勒该地在该时代的文化气质与历史定位，要有画面感和时代感。
 
 ### 非遗瑰宝
-介绍2项该省最具代表性的国家级非物质文化遗产。每项格式如下：
-**[遗产名称]**，然后用1-2句诗意的描述，突出其工艺精髓与美学特征。注意选取真实存在且确属该省的非遗项目。
+介绍2项在该时代该地已存在的代表性技艺或艺术形式。每项格式如下：
+**[技艺名称]**，然后用1-2句诗意的描述，突出其工艺精髓与美学特征。确保所选技艺与时代吻合。
 
 ### 历史名士
-提及2-3位与该省渊源深厚的历史文化人物。每人用1句话概括其成就，并引用其一句代表性名言或诗句（用引号标注）。确保人物与地域的关联真实准确。
+提及2-3位该时代与该地渊源深厚的历史文化人物。每位名士的介绍需遵循以下规格以保证排版美感：
+- 用一句连贯的文字概括其生平与成就（控制在30-40字左右，以使其在卡片左侧呈现约2-3行的丰满度）。
+- 在介绍中引用其最经典的代表性名言或诗句（必须用双引号标注，字数严格控制在10-14字左右。要求是工整的双句五言或七言诗，或是字数对称的经典名言。避免过长或过短的单句，以便右侧竖排美观）。
 
 ## 格式规范
 - 使用 Markdown：### 作为二级标题，** 加粗非遗名称
@@ -53,7 +61,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { location } = req.body || {}
+  const { location, era } = req.body || {}
+  const currentEra = era || '远古至先秦'
+  const cacheKey = `${location}|${currentEra}`
 
   if (!location) {
     return res.status(400).json({ error: '缺少 location 参数' })
@@ -79,8 +89,8 @@ export default async function handler(req, res) {
   res.setHeader('Connection', 'keep-alive')
 
   // Cache hit
-  if (responseCache.has(location)) {
-    const cached = responseCache.get(location)
+  if (responseCache.has(cacheKey)) {
+    const cached = responseCache.get(cacheKey)
     const chars = [...cached]
     const BATCH = 10
     for (let i = 0; i < chars.length; i += BATCH) {
@@ -91,6 +101,8 @@ export default async function handler(req, res) {
     res.end()
     return
   }
+
+  const userMessage = `地点：${location}，时代：${currentEra}`
 
   try {
     const response = await fetch(API_URL, {
@@ -103,7 +115,7 @@ export default async function handler(req, res) {
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `${location}` },
+          { role: 'user', content: userMessage },
         ],
         stream: true,
         temperature: 0.7,
@@ -148,7 +160,7 @@ export default async function handler(req, res) {
     }
 
     if (fullResponseText.trim()) {
-      cacheResponse(location, fullResponseText)
+      cacheResponse(cacheKey, fullResponseText)
     }
 
     res.end()

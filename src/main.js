@@ -1,5 +1,6 @@
 import './style.css'
 import { getCultureContent } from './culture-data.js'
+import { initChat, resetChat, updateNpcContext } from './chat.js'
 
 /* ============================================================
    寻迹华夏 — AI 动态文化地图
@@ -20,10 +21,18 @@ let isStreaming = false;
 let abortController = null;
 
 /* ============================================================
+   Global State — 时空坐标 (省份 + 朝代)
+   ============================================================ */
+const currentState = {
+  province: '',
+  era: '远古至先秦',  // 默认朝代
+};
+
+/* ============================================================
    Client-side Cache — 避免重复调用 API
    key = province name, value = markdown string
    ============================================================ */
-const contentCache = new Map();
+const contentCache = new Map();  // key = "province|era"
 
 /* ============================================================
    Province identification by bounding box center coordinates.
@@ -302,6 +311,10 @@ function initMap() {
       activeOverlay.setAttribute('d', d);
       activeOverlay.style.display = '';
 
+      // Update global state
+      currentState.province = provinceName;
+      activeProvince = provinceName;
+
       // Update right detail panel
       panelProvince.textContent = provinceName;
       setUIState('loading');
@@ -311,8 +324,7 @@ function initMap() {
         abortController.abort();
       }
 
-      activeProvince = provinceName;
-      loadProvinceContent(provinceName);
+      loadProvinceContent(provinceName, currentState.era);
     });
   });
 }
@@ -320,14 +332,19 @@ function initMap() {
 /* ============================================================
    Content Loading — SSE + Typewriter Fallback
    ============================================================ */
-async function loadProvinceContent(province) {
+async function loadProvinceContent(province, era) {
+  // Reset and update NPC Chat context
+  resetChat();
+  updateNpcContext(province, era);
+
   isStreaming = true;
   abortController = new AbortController();
+  const cacheKey = `${province}|${era}`;
 
   // ---- 客户端缓存命中：直接用打字机效果展示 ----
-  if (contentCache.has(province)) {
+  if (contentCache.has(cacheKey)) {
     setUIState('content');
-    const cachedMarkdown = contentCache.get(province);
+    const cachedMarkdown = contentCache.get(cacheKey);
     generatedText.innerHTML = parseMarkdown(cachedMarkdown);
     // 添加淡入效果
     generatedText.style.opacity = '0';
@@ -341,7 +358,7 @@ async function loadProvinceContent(province) {
 
   // ---- 未命中缓存：调用后端 API ----
   try {
-    await streamFromAPI(province, generatedText, abortController.signal);
+    await streamFromAPI(province, era, generatedText, abortController.signal);
   } catch (err) {
     if (err.name === 'AbortError') {
       isStreaming = false;
@@ -360,11 +377,12 @@ async function loadProvinceContent(province) {
 /* ============================================================
    SSE Streaming
    ============================================================ */
-async function streamFromAPI(province, container, signal) {
+async function streamFromAPI(province, era, container, signal) {
+  const cacheKey = `${province}|${era}`;
   const response = await fetch(API_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location: province }),
+    body: JSON.stringify({ location: province, era: era }),
     signal: signal
   });
 
@@ -400,7 +418,7 @@ async function streamFromAPI(province, container, signal) {
         isStreaming = false;
         // 缓存到客户端，下次点击直接展示
         if (accumulatedMarkdown.trim()) {
-          contentCache.set(province, accumulatedMarkdown);
+          contentCache.set(cacheKey, accumulatedMarkdown);
         }
         return;
       }
@@ -427,8 +445,8 @@ async function streamFromAPI(province, container, signal) {
   cursor.remove();
   isStreaming = false;
   // 兜底缓存（流结束但未收到 [DONE] 信号时）
-  if (accumulatedMarkdown.trim() && !contentCache.has(province)) {
-    contentCache.set(province, accumulatedMarkdown);
+  if (accumulatedMarkdown.trim() && !contentCache.has(cacheKey)) {
+    contentCache.set(cacheKey, accumulatedMarkdown);
   }
 }
 
@@ -495,18 +513,59 @@ function streamContent(container, rawText) {
    Simple Markdown Parser
    ============================================================ */
 function parseMarkdown(text) {
+  let currentSection = '';
   return text
     .trim()
     .split('\n')
     .map(line => {
       line = line.trim();
       if (!line) return '';
-      if (line.startsWith('### ')) return `<h3>${line.slice(4)}</h3>`;
-      if (line.startsWith('**') && line.endsWith('**')) return `<p><strong>${line.slice(2, -2)}</strong></p>`;
+      if (line.startsWith('### ')) {
+        currentSection = line.slice(4).trim();
+        return `<h3>${currentSection}</h3>`;
+      }
+      if (line.startsWith('**') && line.endsWith('**')) {
+        return `<p><strong>${line.slice(2, -2)}</strong></p>`;
+      }
       
       // Inline formatting
       line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       line = line.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      
+      if (currentSection === '历史名士') {
+        // Split by sentences using lookbehind to handle multiple scholars in one line
+        const sentences = line.split(/(?<=[。！？])/g).filter(s => s.trim());
+        const parsedSentences = sentences.map(sentence => {
+          // Regex to match quote: prefix, quote content, optional suffix
+          const quoteRegex = /^(.*?)[“"']([^“”"'\n]*)(?:[”"'](.*?))?$/;
+          const match = sentence.match(quoteRegex);
+          if (match) {
+            const prefix = match[1].trim();
+            const quoteText = match[2].trim();
+            const suffix = (match[3] || '').trim();
+            
+            // Format the description
+            let descText = prefix;
+            if (!suffix || suffix === '。' || suffix === '，' || suffix === '：') {
+              // Ensure it ends with a colon
+              descText = descText.replace(/[，。、；]$/, '');
+              if (descText && !descText.endsWith('：') && !descText.endsWith(':')) {
+                descText += '：';
+              }
+            } else {
+              descText = descText + '<span class="poetry-placeholder">『其言』</span>' + suffix;
+            }
+            
+            return `<div class="scholar-item">
+              <div class="scholar-desc">${descText}</div>
+              <div class="poetry-vertical">${quoteText}</div>
+            </div>`;
+          }
+          return `<p>${sentence}</p>`;
+        });
+        return parsedSentences.join('\n');
+      }
+      
       return `<p>${line}</p>`;
     })
     .filter(Boolean)
@@ -537,5 +596,82 @@ async function loadMap() {
   }
 }
 
+/* ============================================================
+   Era Timeline Initialization
+   ============================================================ */
+function initTimeline() {
+  const nodes = document.querySelectorAll('.era-node');
+  const trackFill = document.getElementById('era-track-fill');
+  const totalNodes = nodes.length;
+
+  function setActiveEra(targetNode) {
+    const era = targetNode.dataset.era;
+    const index = parseInt(targetNode.dataset.index, 10);
+
+    // Update active class on all nodes
+    nodes.forEach(n => {
+      n.classList.remove('active');
+      n.setAttribute('aria-pressed', 'false');
+    });
+    targetNode.classList.add('active');
+    targetNode.setAttribute('aria-pressed', 'true');
+
+    // Animate the track fill line
+    const fillPercent = totalNodes > 1 ? (index / (totalNodes - 1)) * 100 : 0;
+    trackFill.style.width = fillPercent + '%';
+
+    // Update global state
+    currentState.era = era;
+
+    // If a province is already selected, reload content for the new era
+    if (currentState.province && !isStreaming) {
+      // Abort any ongoing generation
+      if (abortController) {
+        abortController.abort();
+      }
+      setUIState('loading');
+      loadProvinceContent(currentState.province, currentState.era);
+    }
+  }
+
+  nodes.forEach(node => {
+    node.addEventListener('click', () => setActiveEra(node));
+  });
+}
+
+/* ============================================================
+   Tab Switching — 切换文化探寻与会名士
+   ============================================================ */
+function initTabs() {
+  const tabs = document.querySelectorAll('.panel-tab');
+  const tabViews = document.querySelectorAll('.tab-view');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetTab = tab.dataset.tab;
+
+      // Update active state on tab buttons
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-pressed', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-pressed', 'true');
+
+      // Show the selected tab view
+      tabViews.forEach(view => {
+        view.classList.remove('active');
+      });
+      const targetView = document.getElementById(`${targetTab}-view`);
+      if (targetView) {
+        targetView.classList.add('active');
+      }
+    });
+  });
+}
+
 // Start
 loadMap();
+initTimeline();
+initTabs();
+initChat(() => currentState);

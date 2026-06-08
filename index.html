@@ -116,39 +116,52 @@
 
         <!-- Chat View (新增：会名士) -->
         <div id="chat-view" class="tab-view">
-          <!-- NPC Context Bar -->
-          <div id="chat-context-bar">
-            <span class="chat-context-seal">士</span>
-            <div class="chat-context-info">
-              <span class="chat-context-label">当前名士</span>
-              <span id="chat-npc-name">待寻访</span>
+          <!-- WeChat-like NPC List Sidebar -->
+          <aside id="chat-list-sidebar" aria-label="名士名录">
+            <div class="chat-sidebar-header">
+              <span>名士名录</span>
             </div>
-          </div>
+            <div id="chat-npc-list" role="listbox">
+              <!-- Dynamically populated NPC items -->
+            </div>
+          </aside>
 
-          <!-- Scroll-like message area -->
-          <div id="chat-scroll-area" aria-live="polite" aria-label="对话记录">
-            <!-- Empty State -->
-            <div id="chat-empty-state">
-              <div class="chat-empty-brush">翰</div>
-              <p class="chat-empty-text">
-                选定省份与朝代<br/>
-                唤醒沉睡千年的名士<br/>
-                与古人促膝长谈
-              </p>
-              <p class="chat-empty-hint">试问："先生平生最得意之作为何？"</p>
+          <!-- Chat Main Container -->
+          <div id="chat-main-container">
+            <!-- NPC Context Bar -->
+            <div id="chat-context-bar">
+              <span class="chat-context-seal">士</span>
+              <div class="chat-context-info">
+                <span class="chat-context-label">当前名士</span>
+                <span id="chat-npc-name">待寻访</span>
+              </div>
             </div>
 
-            <!-- Messages Container -->
-            <div id="chat-messages" aria-label="对话内容"></div>
-          </div>
+            <!-- Scroll-like message area -->
+            <div id="chat-scroll-area" aria-live="polite" aria-label="对话记录">
+              <!-- Empty State -->
+              <div id="chat-empty-state">
+                <div class="chat-empty-brush">翰</div>
+                <p class="chat-empty-text">
+                  选定省份与朝代<br/>
+                  唤醒沉睡千年的名士<br/>
+                  与古人促膝长谈
+                </p>
+                <p class="chat-empty-hint">请在左侧选择名士，落笔发问</p>
+              </div>
 
-          <!-- Input Area -->
-          <div id="chat-input-area">
-            <div id="chat-input-wrapper">
-              <textarea id="chat-input" placeholder="请向名士提问…" rows="1" maxlength="500" aria-label="输入对话内容"></textarea>
-              <button id="chat-send-btn" aria-label="发送" title="落笔发送">
-                <span class="send-text">落笔</span>
-              </button>
+              <!-- Messages Container -->
+              <div id="chat-messages" aria-label="对话内容"></div>
+            </div>
+
+            <!-- Input Area -->
+            <div id="chat-input-area">
+              <div id="chat-input-wrapper">
+                <textarea id="chat-input" placeholder="请向名士提问…" rows="1" maxlength="500" aria-label="输入对话内容"></textarea>
+                <button id="chat-send-btn" aria-label="发送" title="落笔发送">
+                  <span class="send-text">落笔</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
